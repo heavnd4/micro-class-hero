@@ -118,8 +118,14 @@ Page({
     const currentQ = this.data.questions[this.data.currentQIdx]
     if (indices.length === 0) return
 
-    // 标准化用户答案为字母数组（如 ["A","B","C"]）
-    const userAns = indices.sort().map(i => currentQ.options[i].charAt(0))
+    // 标准化用户答案：选择题取首字母(A/B/C/D)，判断题取选项原文(正确/错误)
+    const userAns = indices.sort().map(i => {
+      const opt = currentQ.options[i]
+      // 判断题选项没有字母前缀，直接用原文
+      if (currentQ.type === '判断题') return opt
+      // 选择题选项格式如 "A. xxx"，取首字母
+      return opt.charAt(0)
+    })
     // 标准化正确答案为字母数组（兼容字符串 "A" 和数组 ["A","B","C"]）
     let correctAns = currentQ.answer
     if (!Array.isArray(correctAns)) {
