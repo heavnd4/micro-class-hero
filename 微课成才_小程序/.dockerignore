@@ -1,0 +1,27 @@
+# 模型文件（太大，不打进镜像，部署时单独上传到持久化存储）
+models/
+
+# 临时文件
+temp_input/
+temp_output/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.git/
+.workbuddy/
+
+# IDE
+.vscode/
+.idea/
+
+# Node（如果有前端构建）
+node_modules/
+
+# 图片和杂项
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.mp4

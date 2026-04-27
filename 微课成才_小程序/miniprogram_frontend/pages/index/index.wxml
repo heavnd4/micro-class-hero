@@ -21,9 +21,11 @@
 
   <!-- 操作按钮（答题进行中也隐藏） -->
   <view class="btn-group" wx:if="{{questions.length === 0}}">
-    <button type="primary" bindtap="startProcess" disabled="{{isProcessing}}">
-      {{isProcessing ? '正在炼化中...' : '一键开启课程炼化'}}
+    <button type="primary" bindtap="startProcess" disabled="{{isProcessing || engineWarming}}">
+      {{isProcessing ? '正在炼化中...' : engineWarming ? '炼化炉预热中 (' + warmupCountdown + 's)' : '一键开启课程炼化'}}
     </button>
+    <!-- 预热提示 -->
+    <text class="warmup-hint" wx:if="{{engineWarming}}">🔥 AI 模型加载中，请耐心等待...</text>
   </view>
 
   <!-- 答题进度 + 退出按钮 -->

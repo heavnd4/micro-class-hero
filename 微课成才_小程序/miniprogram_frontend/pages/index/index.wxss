@@ -161,3 +161,11 @@ video {
   display: block;
   margin-bottom: 40rpx;
 }
+
+.warmup-hint {
+  display: block;
+  text-align: center;
+  font-size: 24rpx;
+  color: #ff9800;
+  margin-top: 16rpx;
+}

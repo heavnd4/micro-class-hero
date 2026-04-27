@@ -10,7 +10,10 @@ Page({
     chapters: [],
     currentQIdx: 0,
     selectedIndices: [],
-    shortAnswer: '' // 简答题用户输入
+    shortAnswer: '',
+    engineReady: false,     // 引擎是否就绪
+    engineWarming: false,   // 引擎是否正在预热
+    warmupCountdown: 0      // 预热倒计时秒数
   },
 
   onLoad() {
@@ -18,22 +21,114 @@ Page({
       videoUrl: app.globalData.serverUrl + '/video/test_video.mp4'
     })
     this.videoContext = wx.createVideoContext('myVideo')
+    // 静默预热引擎（用户浏览页面时无感加载）
+    this.warmupEngine()
+  },
+
+  warmupEngine() {
+    const serverUrl = app.globalData.serverUrl
+    // 发送 health 请求触发后端预热
+    wx.request({
+      url: serverUrl + '/api/health',
+      success: (res) => {
+        if (res.statusCode === 200 && res.data.status === 'ready') {
+          // 引擎已经就绪
+          this.setData({ engineReady: true, engineWarming: false })
+        } else if (res.statusCode === 202) {
+          // 正在预热中，显示倒计时
+          this.setData({ engineWarming: true })
+          this.startWarmupCountdown(40) // 预计最多 40 秒
+        }
+      },
+      fail: () => {
+        // 请求失败（如本地开发模式），忽略
+      }
+    })
+  },
+
+  startWarmupCountdown(seconds) {
+    this.setData({ warmupCountdown: seconds })
+    const timer = setInterval(() => {
+      const remaining = this.data.warmupCountdown - 1
+      if (remaining <= 0) {
+        clearInterval(timer)
+        this.setData({ warmupCountdown: 0 })
+        // 检查是否就绪
+        this.checkEngineReady()
+        return
+      }
+      this.setData({ warmupCountdown: remaining })
+    }, 1000)
+
+    // 每 5 秒主动查一次状态（不等倒计时结束）
+    const checkTimer = setInterval(() => {
+      if (this.data.engineReady) {
+        clearInterval(checkTimer)
+        clearInterval(timer)
+        return
+      }
+      this.checkEngineReady()
+      if (this.data.engineReady) {
+        clearInterval(timer)
+        clearInterval(checkTimer)
+      }
+    }, 5000)
+  },
+
+  checkEngineReady() {
+    wx.request({
+      url: app.globalData.serverUrl + '/api/engine_status',
+      success: (res) => {
+        if (res.data.ready) {
+          this.setData({ engineReady: true, engineWarming: false, warmupCountdown: 0 })
+        }
+      }
+    })
   },
 
   startProcess() {
+    // 如果引擎还没预热好，提示等待
+    if (!this.data.engineReady && this.data.engineWarming) {
+      wx.showModal({
+        title: '炼化炉预热中',
+        content: `模型正在加载，预计还需 ${this.data.warmupCountdown} 秒，请稍后再试`,
+        showCancel: false
+      })
+      return
+    }
+
     this.setData({ isProcessing: true })
     wx.request({
       url: app.globalData.serverUrl + '/api/start_process',
       method: 'POST',
       data: { video_name: 'test_video.mp4' },
       success: (res) => {
+        if (res.data.status === 'error') {
+          this.setData({ isProcessing: false })
+          if (res.data.message.includes('预热')) {
+            // 引擎还没好，触发预热并提示
+            this.warmupEngine()
+            wx.showModal({
+              title: '炼化炉预热中',
+              content: '首次启动需要加载 AI 模型，请等待约 30 秒后重试',
+              showCancel: false
+            })
+          } else {
+            wx.showModal({
+              title: '出错了',
+              content: res.data.message,
+              showCancel: false
+            })
+          }
+          return
+        }
         this.pollStatus()
       },
       fail: () => {
         this.setData({ isProcessing: false })
         wx.showModal({
-          title: '炼化炉未点火',
-          content: '请确保你电脑上的那个黑窗口（app.py）正在运行',
+          title: '连接失败',
+          content: '请检查网络连接，或确认后端服务正在运行',
           showCancel: false
         })
       }
