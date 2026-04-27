@@ -126,14 +126,34 @@ class VideoProcessor:
         return sorted(frames_dir.glob("frame_*.jpg"))
 
     def structure_text(self, transcript: str, out_dir: Path):
-        """第三步：AI 整理文稿结构"""
+        """第三步：AI 整理文稿结构 (带时间戳)"""
         self.current_step = "AI 结构化整理"
         self.progress = 50
         cache_file = out_dir / "02_structured.json"
         if cache_file.exists(): return json.loads(cache_file.read_text(encoding="utf-8"))
 
         text_input = transcript[:8000]
-        prompt = f"你是一位专业的课程内容整理专家。请将以下原始字幕划分为5-8个章节，改写为书面化正文并以JSON格式返回。JSON格式包含'title'和'chapters'(index, title, content)：\n\n{text_input}"
+        prompt = f"""你是一位专业的课程内容整理专家。请将以下原始字幕划分为5-8个章节。
+每个章节请提供：
+1. 章节标题
+2. 该章节在视频中大概的起始时间（秒数，整数）
+3. 对应的书面化正文
+
+请以JSON格式返回：
+{{
+  "title": "课程标题",
+  "chapters": [
+    {{
+      "index": 1,
+      "title": "章节标题",
+      "timestamp": 0,
+      "content": "正文内容..."
+    }}
+  ]
+}}
+
+原始字幕：
+{text_input}"""
         
         response = self.client.messages.create(
             model=self.model_name,
