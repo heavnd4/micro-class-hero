@@ -19,20 +19,27 @@
     <video id="myVideo" src="{{videoUrl}}" controls></video>
   </view>
 
-  <!-- 操作按钮 -->
-  <view class="btn-group">
+  <!-- 操作按钮（答题进行中也隐藏） -->
+  <view class="btn-group" wx:if="{{questions.length === 0}}">
     <button type="primary" bindtap="startProcess" disabled="{{isProcessing}}">
       {{isProcessing ? '正在炼化中...' : '一键开启课程炼化'}}
     </button>
   </view>
 
+  <!-- 答题进度 + 退出按钮 -->
+  <view class="quiz-header" wx:if="{{questions.length > 0}}">
+    <text class="quiz-progress">第 {{currentQIdx + 1}} / {{questions.length}} 题</text>
+    <button class="exit-quiz-btn" size="mini" bindtap="exitQuiz">退出答题</button>
+  </view>
+
   <!-- 题目挑战区 (处理完成后显示) -->
-  <view class="questions-section" wx:if="{{questions.length > 0}}">
+  <view class="questions-section" wx:if="{{questions.length > 0 && currentQIdx < questions.length}}">
     <view class="q-card">
       <text class="q-type">【{{questions[currentQIdx].type}}】</text>
       <text class="q-text">{{questions[currentQIdx].question}}</text>
       
-      <view class="options">
+      <!-- 选择题 / 判断题 / 多选题：选项按钮 -->
+      <view class="options" wx:if="{{questions[currentQIdx].options}}">
         <block wx:for="{{questions[currentQIdx].options}}" wx:key="index">
           <button 
             class="opt-btn {{utils.includes(selectedIndices, index) ? 'selected' : ''}}" 
@@ -43,6 +50,7 @@
         </block>
       </view>
 
+      <!-- 多选题确认提交按钮 -->
       <button 
         class="submit-btn" 
         type="warn" 
@@ -52,11 +60,38 @@
         确认提交
       </button>
 
+      <!-- 简答题：文本输入 + 提交按钮 -->
+      <view class="short-answer-area" wx:if="{{questions[currentQIdx].type === '简答题'}}">
+        <textarea 
+          class="short-answer-input" 
+          placeholder="在此输入你的答案..." 
+          bindinput="onShortAnswerInput"
+          value="{{shortAnswer}}"
+          maxlength="500"
+          auto-height></textarea>
+        <button 
+          class="submit-btn" 
+          type="warn" 
+          bindtap="submitShortAnswer" 
+          disabled="{{!shortAnswer}}">
+          提交答案
+        </button>
+      </view>
+
 <wxs module="utils">
 module.exports.includes = function(arr, val) {
   return arr.indexOf(val) > -1;
 }
 </wxs>
+    </view>
+  </view>
+
+  <!-- 答题完成 -->
+  <view class="questions-section" wx:if="{{questions.length > 0 && currentQIdx >= questions.length}}">
+    <view class="q-card result-card">
+      <text class="result-title">全部炼化完成！</text>
+      <text class="result-text">恭喜你完成了所有 {{questions.length}} 道题的挑战</text>
+      <button class="submit-btn" type="primary" bindtap="exitQuiz">返回首页</button>
     </view>
   </view>
 </view>

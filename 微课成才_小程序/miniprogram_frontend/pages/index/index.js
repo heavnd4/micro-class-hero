@@ -7,9 +7,10 @@ Page({
     progress: 0,
     videoUrl: '',
     questions: [],
-    chapters: [], // 新增：保存带有时间戳的章节信息
+    chapters: [],
     currentQIdx: 0,
-    selectedIndices: []
+    selectedIndices: [],
+    shortAnswer: '' // 简答题用户输入
   },
 
   onLoad() {
@@ -158,6 +159,52 @@ Page({
         }
       })
     }
+  },
+
+  onShortAnswerInput(e) {
+    this.setData({ shortAnswer: e.detail.value })
+  },
+
+  submitShortAnswer() {
+    const currentQ = this.data.questions[this.data.currentQIdx]
+    if (!this.data.shortAnswer.trim()) return
+
+    wx.showModal({
+      title: '参考答案',
+      content: currentQ.answer,
+      confirmText: '下一题',
+      cancelText: '看解析',
+      success: (res) => {
+        if (res.confirm) {
+          this.setData({ 
+            currentQIdx: this.data.currentQIdx + 1,
+            shortAnswer: ''
+          })
+        } else if (res.cancel) {
+          wx.showModal({
+            title: '解析',
+            content: currentQ['解析'] || '暂无解析',
+            showCancel: false,
+            success: () => {
+              this.setData({ 
+                currentQIdx: this.data.currentQIdx + 1,
+                shortAnswer: ''
+              })
+            }
+          })
+        }
+      }
+    })
+    this.setData({ shortAnswer: '' })
+  },
+
+  exitQuiz() {
+    this.setData({
+      questions: [],
+      currentQIdx: 0,
+      selectedIndices: [],
+      shortAnswer: ''
+    })
   },
 
   // 核心功能：跳转到视频对应章节

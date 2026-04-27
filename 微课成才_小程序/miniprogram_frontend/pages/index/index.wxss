@@ -105,3 +105,59 @@ video {
   border-radius: 10rpx;
   font-weight: bold;
 }
+
+.quiz-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20rpx;
+  padding: 0 10rpx;
+}
+
+.quiz-progress {
+  font-size: 30rpx;
+  color: #333;
+  font-weight: bold;
+}
+
+.exit-quiz-btn {
+  font-size: 24rpx;
+  color: #999;
+  background: #f0f0f0;
+  border: none;
+}
+
+.short-answer-area {
+  margin-top: 30rpx;
+}
+
+.short-answer-input {
+  width: 100%;
+  min-height: 200rpx;
+  padding: 20rpx;
+  border: 1rpx solid #ddd;
+  border-radius: 10rpx;
+  font-size: 28rpx;
+  box-sizing: border-box;
+  background: #fafafa;
+}
+
+.result-card {
+  text-align: center;
+  padding: 60rpx 30rpx;
+}
+
+.result-title {
+  font-size: 40rpx;
+  font-weight: bold;
+  color: #2a5298;
+  display: block;
+  margin-bottom: 20rpx;
+}
+
+.result-text {
+  font-size: 28rpx;
+  color: #666;
+  display: block;
+  margin-bottom: 40rpx;
+}
