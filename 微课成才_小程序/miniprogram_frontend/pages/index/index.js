@@ -44,15 +44,32 @@ Page({
       wx.request({
         url: app.globalData.serverUrl + '/api/get_status',
         success: (res) => {
+          const { current_step, progress } = res.data
           this.setData({
-            currentStep: res.data.current_step,
-            progress: res.data.progress
+            currentStep: current_step,
+            progress: Math.max(progress, 0) // 确保不显示负数
           })
-          if (res.data.current_step === '已完成') {
+          // 炼化完成
+          if (current_step === '已完成') {
             clearInterval(timer)
             this.setData({ isProcessing: false })
             this.fetchData()
           }
+          // 炼化失败
+          if (progress === -1 || current_step.startsWith('炼化失败')) {
+            clearInterval(timer)
+            this.setData({ isProcessing: false })
+            wx.showModal({
+              title: '炼化失败',
+              content: current_step.replace('炼化失败: ', ''),
+              showCancel: false
+            })
+          }
+        },
+        fail: () => {
+          clearInterval(timer)
+          this.setData({ isProcessing: false })
+          wx.showToast({ title: '连接断开', icon: 'none' })
         }
       })
     }, 3000)
