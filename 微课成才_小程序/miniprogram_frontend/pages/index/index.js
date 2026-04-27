@@ -118,10 +118,19 @@ Page({
     const currentQ = this.data.questions[this.data.currentQIdx]
     if (indices.length === 0) return
 
-    const userAns = indices.sort().map(i => currentQ.options[i].charAt(0)).join('')
-    const correctAns = currentQ.answer
+    // 标准化用户答案为字母数组（如 ["A","B","C"]）
+    const userAns = indices.sort().map(i => currentQ.options[i].charAt(0))
+    // 标准化正确答案为字母数组（兼容字符串 "A" 和数组 ["A","B","C"]）
+    let correctAns = currentQ.answer
+    if (!Array.isArray(correctAns)) {
+      correctAns = [correctAns]
+    }
 
-    if (userAns === correctAns) {
+    // 数组比较：长度一致且每个元素都匹配
+    const isCorrect = userAns.length === correctAns.length &&
+      userAns.every((val, idx) => val === correctAns[idx])
+
+    if (isCorrect) {
       wx.showToast({ title: '炼化成功！', icon: 'success' })
       setTimeout(() => {
         this.setData({ 

@@ -221,7 +221,7 @@ class VideoProcessor:
         q_doc.add_heading(f"《{video_stem}》测试题库", 0)
         for i, q in enumerate(questions, 1):
             q_doc.add_paragraph(f"{i}. {q['question']} ({q['type']})")
-            if "options" in q:
+            if q.get("options"):
                 for opt in q["options"]: q_doc.add_paragraph(f"   {opt}")
         
         q_path = out_dir / f"{video_stem}_考题_{timestamp}.docx"
