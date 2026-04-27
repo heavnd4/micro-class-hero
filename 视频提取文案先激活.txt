@@ -1,0 +1,2 @@
+cd E:\.cc项目
+venv\Scripts\activate

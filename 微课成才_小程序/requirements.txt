@@ -1,0 +1,9 @@
+flask
+requests
+faster-whisper
+anthropic
+python-docx
+paddleocr
+opencv-python-headless
+numpy
+ctranslate2==4.6.0

@@ -1,0 +1,7 @@
+{
+  "video_dir": "F:/新建文件夹",
+  "out_dir": "E:\\.cc项目\\视频转换\\输出",
+  "api_key": "sk-sp-a057b4bf1def40ad8b44d6a908b59a84",
+  "frame_every": "60",
+  "extract_mode": "smart"
+}

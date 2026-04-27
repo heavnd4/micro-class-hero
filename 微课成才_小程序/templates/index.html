@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>微课成才 - 英雄守护全链路 Demo</title>
+    <style>
+        :root {
+            --parent-color: #4a90e2;
+            --student-color: #f5a623;
+            --bg-color: #f0f2f5;
+            --hero-primary: #f5a623;
+            --hero-glow: rgba(245, 166, 35, 0.5);
+        }
+        body, html {
+            margin: 0; padding: 0; height: 100%; font-family: '微软雅黑', sans-serif;
+            background: var(--bg-color); overflow: hidden;
+        }
+        .container { display: flex; height: 100vh; }
+        
+        .panel { flex: 1; display: flex; flex-direction: column; border-right: 2px dashed #ccc; position: relative; }
+        .panel-header { padding: 15px; color: white; text-align: center; font-weight: bold; font-size: 1.2em; box-shadow: 0 2px 10px rgba(0,0,0,0.1); z-index: 10; }
+        .content { flex: 1; padding: 20px; overflow-y: auto; }
+
+        .parent-panel { background: #fff; }
+        .parent-panel .panel-header { background: var(--parent-color); }
+        .student-panel { background: #fff; border-right: none; transition: all 0.5s ease; }
+        .student-panel .panel-header { background: var(--hero-primary); }
+
+        /* 英雄选择大厅 */
+        #heroSelector {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: #1a1a1a; color: white; z-index: 100;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+        .hero-cards { display: flex; gap: 30px; margin-top: 30px; }
+        .hero-card {
+            background: #2a2a2a; border: 2px solid #444; border-radius: 15px;
+            padding: 20px; width: 180px; text-align: center; cursor: pointer;
+            transition: all 0.3s; position: relative; overflow: hidden;
+        }
+        .hero-card:hover { transform: translateY(-10px); border-color: gold; box-shadow: 0 0 20px gold; }
+        .hero-card h4 { margin: 15px 0 5px; font-size: 1.2em; }
+        .hero-card p { font-size: 0.8em; color: #aaa; }
+        .hero-svg-preview { width: 100px; height: 100px; margin: 0 auto; }
+
+        /* 题目预览卡片 */
+        .q-card { border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; border-radius: 8px; font-size: 0.9em; }
+        .q-type { color: #888; font-size: 0.8em; margin-bottom: 5px; }
+        
+        /* 英雄状态栏 */
+        .hero-bar { 
+            background: #2c3e50; color: white; padding: 12px; display: flex; 
+            align-items: center; border-radius: 12px; margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            border: 1px solid var(--hero-primary);
+        }
+        .hero-avatar-frame { 
+            width: 60px; height: 60px; position: relative; margin-right: 15px;
+            filter: drop-shadow(0 0 5px var(--hero-glow));
+        }
+        .exp-track { flex: 1; height: 12px; background: #444; border-radius: 6px; overflow: hidden; margin: 0 10px; border: 1px solid #555; }
+        .exp-fill { height: 100%; background: linear-gradient(90deg, var(--hero-primary), #fff); width: 0%; transition: width 0.4s; }
+
+        /* 报告样式 */
+        .stat-grid { display: flex; justify-content: space-around; margin: 20px 0; border-top: 1px solid #eee; padding-top: 15px; }
+        .stat-item { flex: 1; text-align: center; }
+        .stat-val { font-size: 1.5em; font-weight: bold; color: var(--parent-color); }
+        .stat-label { font-size: 0.8em; color: #666; }
+        .review-plan { background: #f9f9f9; padding: 10px; border-radius: 8px; text-align: left; margin-top: 15px; }
+
+        /* 弹窗通用样式 */
+        .video-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); display: none; flex-direction: column;
+            align-items: center; justify-content: center; z-index: 1000;
+        }
+        .video-container { width: 85%; max-width: 900px; background: #fff; position: relative; border-radius: 10px; overflow: hidden; }
+        video { width: 100%; display: block; background: #000; }
+        .close-video { position: absolute; top: 10px; right: 10px; color: #fff; cursor: pointer; background: rgba(0,0,0,0.5); padding: 5px 15px; border-radius: 20px; z-index: 1100; }
+        
+        .btn { padding: 12px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        .btn-send { background: var(--parent-color); color: white; width: 100%; margin-top: 10px; }
+        .btn-option { display: block; width: 100%; text-align: left; margin: 8px 0; background: #f8f9fa; border: 1px solid #eee; padding: 12px; border-radius: 6px; }
+        .btn-option:hover { background: #fff; border-color: var(--hero-primary); }
+
+        .hidden { display: none; }
+        @keyframes rotate-magic { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .magic-ring { animation: rotate-magic 10s linear infinite; transform-origin: center; }
+        @keyframes pulse-light { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
+        .glow-effect { animation: pulse-light 2s infinite; }
+    </style>
+</head>
+<body>
+    <!-- 英雄召唤大厅 -->
+    <div id="heroSelector">
+        <h2 style="letter-spacing: 4px; color: gold;">唤醒你的守护者</h2>
+        <p style="color: #888;">选择一位英雄，陪你一起征战微课世界</p>
+        <div class="hero-cards">
+            <div class="hero-card" onclick="selectHero('qi')">
+                <div class="hero-svg-preview" id="svgQi"></div>
+                <h4>音律者 · 琦</h4>
+                <div style="font-size:0.7em; color: #a338ff;">[ 英语强化 ]</div>
+            </div>
+            <div class="hero-card" onclick="selectHero('fan')">
+                <div class="hero-svg-preview" id="svgFan"></div>
+                <h4>逻辑刃 · 繁</h4>
+                <div style="font-size:0.7em; color: #38a3ff;">[ 数学逻辑 ]</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- 左侧：家长端模拟 -->
+        <div class="panel parent-panel">
+            <div class="panel-header">👩‍🏫 家长端（任务管理）</div>
+            <div class="content" id="parentHome">
+                <div style="margin-bottom: 20px;">
+                    <label>视频链接：</label>
+                    <input type="text" value="https://www.bilibili.com/video/BV1ixfFBrEhG/" style="width: 100%; border: 1px solid #ddd;" disabled>
+                    <p style="font-size: 0.8em; color: green; margin-top:5px;">✓ 视频抓取成功 - 小学英语四年级</p>
+                </div>
+                <div id="questionsPreview">
+                    <p>正在加载 AI 生成题目预览...</p>
+                </div>
+                <button class="btn btn-send" onclick="sendTask()">审核无误，发给孩子挑战任务</button>
+            </div>
+            
+            <!-- 家长报告区域 -->
+            <div class="content hidden" id="parentReport">
+                <h3 style="color: var(--parent-color); text-align: center;">📊 挑战成绩单</h3>
+                <div class="stat-grid">
+                    <div class="stat-item"><div class="stat-val" id="resCorrect">0%</div><div class="stat-label">掌握度</div></div>
+                    <div class="stat-item"><div class="stat-val" id="resExp">+0</div><div class="stat-label">经验值值</div></div>
+                    <div class="stat-item"><div class="stat-val" id="resReview">0次</div><div class="stat-label">回看</div></div>
+                </div>
+                <div class="review-plan">
+                    <strong style="color: #d35400;">🧠 科学抗遗忘计划：</strong>
+                    <ul style="font-size: 0.85em; color: #444;">
+                        <li>明日复习：<span id="date1">-</span></li>
+                        <li>3日后复习：<span id="date3">-</span></li>
+                        <li>7日后复习：<span id="date7">-</span></li>
+                    </ul>
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button class="btn" style="flex: 1; background: #27ae60; color: white;" onclick="openLecture()">📖 查阅讲义</button>
+                    <button class="btn" style="flex: 1; background: #e67e22; color: white;" onclick="downloadWord()">📥 下载 Word</button>
+                </div>
+                <button class="btn btn-send" style="margin-top:10px; background: #95a5a6;" onclick="location.reload()">准备下个任务</button>
+            </div>
+        </div>
+
+        <!-- 右侧：学生端模拟 -->
+        <div class="panel student-panel">
+            <div class="panel-header" id="stuHeader">⚔️ 勇者挑战</div>
+            <div class="content">
+                <div class="hero-bar">
+                    <div class="hero-avatar-frame" id="currentHeroAvatar"></div>
+                    <div style="flex: 1;">
+                        <div style="font-size: 0.9em; font-weight: bold;"><span id="rankName">见习勇者</span> · <span id="heroName">尚未召唤</span></div>
+                        <div class="exp-track"><div class="exp-fill" id="expBar"></div></div>
+                        <div style="font-size: 0.75em; opacity: 0.8;">英雄战力: <span id="expVal">0</span> / 100</div>
+                    </div>
+                </div>
+
+                <div id="taskNotice" style="text-align: center; padding: 60px 20px; color: #888;">等待家长开启挑战任务...</div>
+                
+                <div id="quizArea" class="hidden">
+                    <div class="q-type" id="qType">单选题</div>
+                    <div id="qText" style="font-weight: bold; margin-bottom: 20px;"></div>
+                    <div id="qOptions"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 视频弹窗 -->
+    <div id="videoOverlay" class="video-overlay">
+        <div class="video-container" style="background:#000;">
+            <span class="close-video" onclick="closeVideo()">✖ 关闭并继续</span>
+            <video id="player" controls><source src="/video/test_video.mp4" type="video/mp4"></video>
+        </div>
+    </div>
+
+    <!-- 讲义预览弹窗 -->
+    <div id="lectureOverlay" class="video-overlay" style="background: #fff;">
+        <div class="video-container" style="padding: 30px; height: 80vh; overflow-y: auto;">
+            <span class="close-video" style="color:#333;" onclick="closeLecture()">✖ 关闭</span>
+            <h2 id="lectureTitle"></h2>
+            <div id="lectureContent"></div>
+        </div>
+    </div>
+
+    <script>
+        const HERO_ASSETS = {
+            qi: {
+                name: '音律者 · 琦', color: '#a338ff', glow: 'rgba(163, 56, 255, 0.5)', rank: '音律学徒', proRank: '音律法师',
+                init: `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="30" fill="#a338ff" class="glow-effect"/><path d="M45,40 Q50,30 55,40" fill="none" stroke="#fff" stroke-width="3"/></svg>`,
+                promoted: `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="none" stroke="gold" class="magic-ring"/><circle cx="50" cy="50" r="25" fill="#ff38a3"/></svg>`
+            },
+            fan: {
+                name: '逻辑刃 · 繁', color: '#38a3ff', glow: 'rgba(56, 163, 255, 0.5)', rank: '见习剑客', proRank: '寒霜骑士',
+                init: `<svg viewBox="0 0 100 100"><path d="M50,20 L80,50 L50,80 L20,50 Z" fill="#38a3ff" class="glow-effect"/></svg>`,
+                promoted: `<svg viewBox="0 0 100 100"><path d="M50,5 L95,50 L50,95 L5,50 Z" fill="none" stroke="gold" class="magic-ring"/><path d="M50,20 L80,50 L50,80 L20,50 Z" fill="#fff"/></svg>`
+            }
+        };
+
+        let selectedHero = null, allQuestions = [], currentIndex = 0, exp = 0, correctCount = 0, reviewCount = 0;
+        const chapterTimes = { "章节1": 0, "章节2": 42, "章节3": 69, "章节4": 92, "章节5": 113 };
+
+        document.getElementById('svgQi').innerHTML = HERO_ASSETS.qi.init;
+        document.getElementById('svgFan').innerHTML = HERO_ASSETS.fan.init;
+
+        function selectHero(key) {
+            selectedHero = HERO_ASSETS[key];
+            document.querySelector('.student-panel').style.setProperty('--hero-primary', selectedHero.color);
+            document.getElementById('heroName').innerText = selectedHero.name;
+            document.getElementById('rankName').innerText = selectedHero.rank;
+            document.getElementById('currentHeroAvatar').innerHTML = selectedHero.init;
+            document.getElementById('stuHeader').style.background = selectedHero.color;
+            document.getElementById('heroSelector').style.display = 'none';
+        }
+
+        fetch('/api/get_questions').then(res => res.json()).then(data => {
+            allQuestions = data;
+            const preview = document.getElementById('questionsPreview');
+            preview.innerHTML = `<h4>题目预览 (${data.length}道)</h4>`;
+            data.slice(0, 5).forEach(q => { preview.innerHTML += `<div class="q-card"><div class="q-type">${q.type}</div><div>${q.question}</div></div>`; });
+        });
+
+        function sendTask() {
+            document.getElementById('taskNotice').classList.add('hidden');
+            document.getElementById('quizArea').classList.remove('hidden');
+            showQuestion();
+        }
+
+        function showQuestion() {
+            const q = allQuestions[currentIndex];
+            document.getElementById('qType').innerText = q.type;
+            document.getElementById('qText').innerText = q.question;
+            const optDiv = document.getElementById('qOptions');
+            optDiv.innerHTML = '';
+            
+            if(q.type === '判断题') {
+                ['正确', '错误'].forEach(opt => {
+                    const btn = document.createElement('button'); btn.className = 'btn-option'; btn.innerText = opt;
+                    btn.onclick = () => checkAnswer(opt === q.answer || (opt === '正确' && q.answer === '正确'));
+                    optDiv.appendChild(btn);
+                });
+            } else if(q.type === '简答题') {
+                optDiv.innerHTML = '<textarea id="eIn" style="width:100%; height:60px;"></textarea><button class="btn btn-send" onclick="submitEssay()">提交</button>';
+            } else if(q.options) {
+                q.options.forEach(opt => {
+                    const btn = document.createElement('button'); btn.className = 'btn-option'; btn.innerText = opt;
+                    btn.onclick = () => checkAnswer(opt.startsWith(q.answer));
+                    optDiv.appendChild(btn);
+                });
+            }
+        }
+
+        function submitEssay() {
+            alert('老师参考答案：\n' + allQuestions[currentIndex].answer);
+            checkAnswer(true);
+        }
+
+        function checkAnswer(isCorrect) {
+            if (isCorrect) { exp += 5; correctCount++; updateHero(); nextQuestion(); }
+            else { if (confirm('答错了！要看讲解吗？')) { reviewCount++; playFlashback(allQuestions[currentIndex].explanation); } else { nextQuestion(); } }
+        }
+
+        function playFlashback(exp) {
+            const match = exp.match(/章节(\d+)/);
+            const time = chapterTimes[`章节${match ? match[1] : 1}`] || 0;
+            document.getElementById('videoOverlay').style.display = 'flex';
+            document.getElementById('player').currentTime = time;
+            document.getElementById('player').play();
+        }
+
+        function closeVideo() { document.getElementById('player').pause(); document.getElementById('videoOverlay').style.display = 'none'; nextQuestion(); }
+
+        function nextQuestion() {
+            currentIndex++;
+            if (currentIndex < allQuestions.length) showQuestion();
+            else showFinalReport();
+        }
+
+        function showFinalReport() {
+            document.getElementById('currentHeroAvatar').innerHTML = selectedHero.promoted;
+            document.getElementById('rankName').innerText = selectedHero.proRank;
+            document.getElementById('parentHome').classList.add('hidden');
+            document.getElementById('parentReport').classList.remove('hidden');
+            document.getElementById('resCorrect').innerText = Math.round((correctCount/allQuestions.length)*100) + '%';
+            document.getElementById('resExp').innerText = '+' + exp;
+            document.getElementById('resReview').innerText = reviewCount + '次';
+            const now = new Date();
+            const fmt = (d) => { const x = new Date(now.getTime() + d*86400000); return (x.getMonth()+1)+'月'+x.getDate()+'日'; };
+            document.getElementById('date1').innerText = fmt(1); document.getElementById('date3').innerText = fmt(3); document.getElementById('date7').innerText = fmt(7);
+        }
+
+        function openLecture() {
+            fetch('/api/get_lecture').then(res => res.json()).then(data => {
+                document.getElementById('lectureTitle').innerText = data.title;
+                const div = document.getElementById('lectureContent'); div.innerHTML = '';
+                data.chapters.forEach(ch => { div.innerHTML += `<h4>${ch.title}</h4><p>${ch.content}</p>`; });
+                document.getElementById('lectureOverlay').style.display = 'flex';
+            });
+        }
+        function closeLecture() { document.getElementById('lectureOverlay').style.display = 'none'; }
+        function downloadWord() { window.location.href = '/api/download_word'; }
+        function updateHero() { document.getElementById('expBar').style.width = Math.min(exp, 100) + '%'; document.getElementById('expVal').innerText = exp; }
+    </script>
+</body>
+</html>

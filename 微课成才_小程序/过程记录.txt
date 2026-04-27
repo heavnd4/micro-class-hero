@@ -1,0 +1,7 @@
+小程序简介：
+利用AI动态激发记忆规律和游戏天性。让家长放心，让孩子的学习像打游戏一样有瘾，（人工智能时代刷题已经失去性价比。）括号里面内容违规。
+
+小程序成长计划
+https://developers.weixin.qq.com/miniprogram/dev/wxcloudservice/wxcloud/billing/ai-inspire-plan.html
+微信云托管包括计费
+https://developers.weixin.qq.com/miniprogram/dev/wxcloudservice/wxcloudrun/src/Billing/price.html

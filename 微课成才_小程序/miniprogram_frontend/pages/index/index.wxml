@@ -1,0 +1,62 @@
+<view class="container">
+  <!-- 标题与英雄状态 -->
+  <view class="header">
+    <view class="hero-display">
+      <image class="hero-img" src="../../images/hero_qi.svg" mode="aspectFit"></image>
+      <view class="hero-info">
+        <text class="hero-name">音律者 · 琦</text>
+        <text class="hero-title">等级：课程炼化师</text>
+      </view>
+    </view>
+    <view class="status-bar">
+      <view class="progress" style="width: {{progress}}%"></view>
+    </view>
+    <text class="status-text">{{currentStep}} ({{progress}}%)</text>
+  </view>
+
+  <!-- 视频预览区 -->
+  <view class="video-section">
+    <video id="myVideo" src="{{videoUrl}}" controls></video>
+  </view>
+
+  <!-- 操作按钮 -->
+  <view class="btn-group">
+    <button type="primary" bindtap="startProcess" disabled="{{isProcessing}}">
+      {{isProcessing ? '正在炼化中...' : '一键开启课程炼化'}}
+    </button>
+  </view>
+
+  <!-- 题目挑战区 (处理完成后显示) -->
+  <view class="questions-section" wx:if="{{questions.length > 0}}">
+    <view class="q-card">
+      <text class="q-type">【{{questions[currentQIdx].type}}】</text>
+      <text class="q-text">{{questions[currentQIdx].question}}</text>
+      
+      <view class="options">
+        <block wx:for="{{questions[currentQIdx].options}}" wx:key="index">
+          <button 
+            class="opt-btn {{utils.includes(selectedIndices, index) ? 'selected' : ''}}" 
+            bindtap="selectOption" 
+            data-index="{{index}}">
+            {{item}}
+          </button>
+        </block>
+      </view>
+
+      <button 
+        class="submit-btn" 
+        type="warn" 
+        wx:if="{{questions[currentQIdx].type === '多选题'}}" 
+        bindtap="submitMultiAnswer" 
+        disabled="{{selectedIndices.length === 0}}">
+        确认提交
+      </button>
+
+<wxs module="utils">
+module.exports.includes = function(arr, val) {
+  return arr.indexOf(val) > -1;
+}
+</wxs>
+    </view>
+  </view>
+</view>

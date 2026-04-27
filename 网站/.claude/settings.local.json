@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//e/.cc 项目/**)",
+      "Bash(dir \"风水类独立站\\\\收集的资料照片\")",
+      "WebSearch"
+    ]
+  }
+}
