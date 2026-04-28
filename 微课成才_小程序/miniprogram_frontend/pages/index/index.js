@@ -14,46 +14,108 @@ Page({
     engineReady: false,     // 引擎是否就绪
     engineWarming: false,   // 引擎是否正在预热
     warmupCountdown: 0,     // 预热倒计时秒数
-    debugMode: false        // 调试模式（跳题按钮 + 秒过）
+    debugMode: false,       // 调试模式（跳题按钮 + 秒过）
+    backendAlive: false,    // 后端容器是否存活
+    coldStarting: false     // 是否正在等待冷启动
   },
 
   onLoad() {
     this.videoContext = wx.createVideoContext('myVideo')
-    this.loadVideoUrl()
-    // 静默预热引擎（用户浏览页面时无感加载）
-    this.warmupEngine()
-    // 继承 debugMode
     this.setData({ debugMode: app.globalData.debugMode })
+    // 第一步：先探测后端是否存活（不并发发请求，避免冷启动时全部超时）
+    this.probeBackend()
+  },
+
+  /**
+   * 探测后端容器是否存活，存活后再加载资源
+   * 冷启动时容器可能需要 30-90 秒才能响应
+   */
+  probeBackend() {
+    console.log('[探测] 检查后端容器状态...')
+    this.setData({ coldStarting: true })
+
+    app.api('/api/health').then(res => {
+      // 后端存活了
+      this.setData({ backendAlive: true, coldStarting: false })
+      console.log('[探测] 后端容器已响应:', res.data.status)
+
+      if (res.statusCode === 200 && res.data.status === 'ready') {
+        this.setData({ engineReady: true })
+      } else if (res.statusCode === 202) {
+        // 引擎预热中，后端已存活，可以开始加载视频
+        this.setData({ engineWarming: true })
+        this.startWarmupCountdown(40)
+      }
+
+      // 后端存活了，加载视频
+      this.loadVideoUrl()
+    }).catch(err => {
+      // 第一次探测失败 = 冷启动中
+      console.log('[探测] 后端未响应（冷启动中），开始轮询等待...', err)
+      this.pollBackendAlive()
+    })
+  },
+
+  /**
+   * 轮询等待后端容器冷启动完成
+   * 每 5 秒探测一次，最多等 120 秒
+   */
+  pollBackendAlive() {
+    let attempts = 0
+    const maxAttempts = 24 // 24 * 5s = 120s
+
+    const timer = setInterval(() => {
+      attempts++
+      console.log(`[探测] 第 ${attempts}/${maxAttempts} 次尝试...`)
+
+      app.api('/api/health').then(res => {
+        clearInterval(timer)
+        this.setData({ backendAlive: true, coldStarting: false })
+        console.log('[探测] 后端容器已响应！耗时约', attempts * 5, '秒')
+
+        if (res.statusCode === 200 && res.data.status === 'ready') {
+          this.setData({ engineReady: true })
+        } else if (res.statusCode === 202) {
+          this.setData({ engineWarming: true })
+          this.startWarmupCountdown(40)
+        }
+
+        // 后端活了，加载视频
+        this.loadVideoUrl()
+      }).catch(() => {
+        if (attempts >= maxAttempts) {
+          clearInterval(timer)
+          this.setData({ coldStarting: false })
+          console.error('[探测] 后端容器 120 秒内未响应')
+          wx.showModal({
+            title: '后端服务未响应',
+            content: '后端容器启动超时（可能正在冷启动），请点击确定重试',
+            confirmText: '重试',
+            showCancel: false,
+            success: () => {
+              this.probeBackend()
+            }
+          })
+        }
+        // 否则继续等...
+      })
+    }, 5000)
   },
 
   loadVideoUrl() {
     if (app.globalData.localMode) {
       this.setData({ videoUrl: app.globalData.localServerUrl + '/video/test_video.mp4' })
-    } else {
-      // 云托管模式：通过 callContainer 调后端接口获取 COS 临时链接
-      app.api('/api/get_video_url?video=test_video.mp4').then(res => {
-        if (res.statusCode === 200 && res.data.url) {
-          this.setData({ videoUrl: res.data.url })
-        } else {
-          console.log('获取视频链接失败:', res.data)
-        }
-      }).catch(err => {
-        console.log('获取视频链接失败:', err)
-      })
+      return
     }
-  },
-
-  warmupEngine() {
-    // 发送 health 请求触发后端预热
-    app.api('/api/health').then(res => {
-      if (res.statusCode === 200 && res.data.status === 'ready') {
-        this.setData({ engineReady: true, engineWarming: false })
-      } else if (res.statusCode === 202) {
-        this.setData({ engineWarming: true })
-        this.startWarmupCountdown(40)
+    // 云托管模式：通过 callContainer 调后端接口获取 COS 临时链接
+    app.api('/api/get_video_url?video=test_video.mp4').then(res => {
+      if (res.statusCode === 200 && res.data.url) {
+        this.setData({ videoUrl: res.data.url })
+      } else {
+        console.log('获取视频链接失败:', res.data)
       }
-    }).catch(() => {
-      // 请求失败，忽略
+    }).catch(err => {
+      console.log('获取视频链接失败:', err)
     })
   },
 
@@ -101,6 +163,14 @@ Page({
       })
       return
     }
+    if (!this.data.backendAlive) {
+      wx.showModal({
+        title: '后端未就绪',
+        content: '正在等待后端容器启动，请稍后再试',
+        showCancel: false
+      })
+      return
+    }
 
     this.setData({ isProcessing: true })
     app.api('/api/start_process', {
@@ -134,6 +204,17 @@ Page({
         showCancel: false
       })
     })
+  },
+
+  warmupEngine() {
+    app.api('/api/health').then(res => {
+      if (res.statusCode === 200 && res.data.status === 'ready') {
+        this.setData({ engineReady: true, engineWarming: false })
+      } else if (res.statusCode === 202) {
+        this.setData({ engineWarming: true })
+        this.startWarmupCountdown(40)
+      }
+    }).catch(() => {})
   },
 
   pollStatus() {
@@ -181,7 +262,6 @@ Page({
     let { selectedIndices } = this.data
 
     if (currentQ.type === '单选题' || currentQ.type === '判断题') {
-      // 调试模式：直接跳下一题，不做对错判断
       if (this.data.debugMode) {
         this.setData({ currentQIdx: this.data.currentQIdx + 1, selectedIndices: [] })
         return
@@ -199,7 +279,6 @@ Page({
   },
 
   submitMultiAnswer() {
-    // 调试模式：直接跳下一题
     if (this.data.debugMode) {
       this.setData({ currentQIdx: this.data.currentQIdx + 1, selectedIndices: [] })
       return
@@ -227,9 +306,9 @@ Page({
     if (isCorrect) {
       wx.showToast({ title: '炼化成功！', icon: 'success' })
       setTimeout(() => {
-        this.setData({ 
+        this.setData({
           currentQIdx: this.data.currentQIdx + 1,
-          selectedIndices: [] 
+          selectedIndices: []
         })
       }, 1500)
     } else {
@@ -254,7 +333,6 @@ Page({
 
   submitShortAnswer() {
     const currentQ = this.data.questions[this.data.currentQIdx]
-    // 调试模式：自动填入内容后直接显示参考答案跳下一题
     if (this.data.debugMode) {
       wx.showModal({
         title: '参考答案',
@@ -277,7 +355,7 @@ Page({
       cancelText: '看解析',
       success: (res) => {
         if (res.confirm) {
-          this.setData({ 
+          this.setData({
             currentQIdx: this.data.currentQIdx + 1,
             shortAnswer: ''
           })
@@ -287,7 +365,7 @@ Page({
             content: currentQ['解析'] || '暂无解析',
             showCancel: false,
             success: () => {
-              this.setData({ 
+              this.setData({
                 currentQIdx: this.data.currentQIdx + 1,
                 shortAnswer: ''
               })
@@ -310,7 +388,6 @@ Page({
 
   // ===== 调试模式：跳题功能 =====
 
-  // 跳到指定题型的第一道题（从当前位置往后找）
   skipToType(e) {
     const { type } = e.currentTarget.dataset
     const questions = this.data.questions
@@ -323,13 +400,11 @@ Page({
     wx.showToast({ title: '后面没有该题型了', icon: 'none' })
   },
 
-  // 跳到最后一道题（通常测试简答题）
   skipToLast() {
     const lastIdx = this.data.questions.length - 1
     this.setData({ currentQIdx: lastIdx, selectedIndices: [], shortAnswer: '' })
   },
 
-  // 跳到第N题（直接输入序号）
   skipToQuestion() {
     const total = this.data.questions.length
     wx.showActionSheet({
@@ -341,9 +416,9 @@ Page({
   },
 
   jumpToVideoSource() {
-    const chapterIdx = Math.floor(this.data.currentQIdx / 4) 
+    const chapterIdx = Math.floor(this.data.currentQIdx / 4)
     const chapter = this.data.chapters[chapterIdx]
-    
+
     if (chapter && chapter.timestamp !== undefined) {
       wx.showToast({ title: '回溯到：' + chapter.title, icon: 'none' })
       this.videoContext.seek(chapter.timestamp)

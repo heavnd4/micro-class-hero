@@ -18,7 +18,7 @@ import numpy as np
 
 def _is_cloud_env():
     """判断是否运行在云托管环境"""
-    return os.environ.get("WX_ENV") or os.environ.get("TENCENTCLOUD_RUN_ENV") or os.environ.get("WX_CLOUD_RUN")
+    return os.environ.get("COS_BUCKET") or os.environ.get("WX_ENV") or os.environ.get("TENCENTCLOUD_RUN_ENV") or os.environ.get("WX_CLOUD_RUN")
 
 def _sync_models_from_cos(models_dir: Path):
     """从对象存储同步模型文件到本地（仅云托管环境）"""
@@ -156,7 +156,7 @@ class VideoProcessor:
             whisper_path = self.models_dir / "models--Systran--faster-whisper-small" / "snapshots" / "main"
             print("📦 加载 whisper 模型（约 20-30 秒）...")
             start = time.time()
-            self._whisper_model = WhisperModel(str(whisper_path), device="cpu", compute_type="int8")
+            self._whisper_model = WhisperModel(str(whisper_path), device="cpu", compute_type="int8", download=False)
             print(f"✅ whisper 模型加载完成（{time.time()-start:.1f}s）")
         return self._whisper_model
 

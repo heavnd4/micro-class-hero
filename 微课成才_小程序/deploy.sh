@@ -25,6 +25,7 @@ echo "0" | wxcloud run:deploy . \
   --envId "$ENV_ID" \
   --serviceName "$SERVICE" \
   --containerPort 5000 \
+  --dockerfile Dockerfile \
   --noConfirm \
   --override \
   --remark "$REMARK"

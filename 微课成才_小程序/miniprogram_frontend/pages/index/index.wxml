@@ -1,4 +1,15 @@
 <view class="container">
+  <!-- 冷启动等待提示 -->
+  <view class="cold-start-overlay" wx:if="{{coldStarting}}">
+    <text class="cold-start-icon">🚀</text>
+    <text class="cold-start-text">
+      正在连接后端服务...
+      <secondary>首次访问可能需要等待 30-60 秒（云服务冷启动）</secondary>
+    </text>
+  </view>
+
+  <!-- 正常内容（后端存活后才显示） -->
+  <block wx:else>
   <!-- 标题与英雄状态 -->
   <view class="header">
     <view class="hero-display">
@@ -106,4 +117,5 @@ module.exports.includes = function(arr, val) {
       <button class="submit-btn" type="primary" bindtap="exitQuiz">返回首页</button>
     </view>
   </view>
+  </block>
 </view>

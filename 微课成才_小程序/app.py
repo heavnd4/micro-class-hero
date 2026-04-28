@@ -84,6 +84,25 @@ def engine_status():
         return jsonify({"ready": False, "loading": False, "message": "引擎未启动"})
 
 
+# ========== 调试接口 ==========
+
+@app.route('/api/debug_env')
+def debug_env():
+    """调试接口：返回云托管容器环境变量（仅用于排查问题，上线前删除）"""
+    env_keys = [k for k in os.environ if any(x in k for x in ['COS', 'WX', 'TENCENT', 'PORT', 'DASH', 'AI_'])]
+    env_vals = {k: os.environ.get(k, '') for k in env_keys}
+    video_dir_files = list(VIDEO_DIR.glob("*")) if VIDEO_DIR.exists() else []
+    return jsonify({
+        "env_vars": env_vals,
+        "video_dir": str(VIDEO_DIR),
+        "video_dir_exists": VIDEO_DIR.exists(),
+        "video_files": [f.name for f in video_dir_files],
+        "output_dir": str(OUTPUT_DIR),
+        "output_dir_exists": OUTPUT_DIR.exists(),
+        "engine_ready": engine_ready
+    })
+
+
 # ========== 视频上传接口 ==========
 
 @app.route('/api/upload_video', methods=['POST'])
@@ -128,11 +147,24 @@ def start_process():
     video_name = data.get('video_name', 'test_video.mp4')
     video_path = VIDEO_DIR / video_name
 
-    if not video_path.exists():
-        return jsonify({"status": "error", "message": "视频文件不存在"}), 404
+    # 云托管环境：通过 COS_BUCKET 等环境变量判断（WX_ENV/TENCENTCLOUD_RUN_ENV 不一定存在）
+    env_flag = os.environ.get("COS_BUCKET") or os.environ.get("WX_ENV") or os.environ.get("TENCENTCLOUD_RUN_ENV")
+    if not env_flag and not video_path.exists():
+        return jsonify({"status": "error", "message": f"视频文件不存在: {video_name}"}), 404
 
     def background_task():
         try:
+            # 云托管环境：视频不存在时从COS下载（在后台线程中执行，不阻塞callContainer）
+            if not video_path.exists():
+                processor.current_step = "视频下载中..."
+                processor.progress = 0
+                print(f"📦 视频不存在，尝试从COS下载: {video_name}")
+                if not _download_from_cos(video_name, video_path):
+                    processor.current_step = "炼化失败: 视频下载失败"
+                    processor.progress = -1
+                    return
+                print(f"✅ 视频下载成功: {video_name}")
+
             processor.current_step = "炼化启动中..."
             processor.progress = 0
             processor.process(str(video_path), str(OUTPUT_DIR))
@@ -245,41 +277,55 @@ def download_word():
 
 # ========== 启动 ==========
 
-def _sync_video_from_cos():
-    """云托管环境下，从对象存储下载视频到 temp_input（仅当本地不存在时）"""
-    env_flag = os.environ.get("WX_ENV") or os.environ.get("TENCENTCLOUD_RUN_ENV")
+def _download_from_cos(key, local_path):
+    """从对象存储下载文件到本地（云托管容器内网专用），返回是否成功"""
+    env_flag = os.environ.get("COS_BUCKET") or os.environ.get("WX_ENV") or os.environ.get("TENCENTCLOUD_RUN_ENV")
     if not env_flag:
-        return
+        print(f"⚠️ 非云托管环境，跳过COS下载（COS_BUCKET={os.environ.get('COS_BUCKET')}, WX_ENV={os.environ.get('WX_ENV')}, TENCENTCLOUD_RUN_ENV={os.environ.get('TENCENTCLOUD_RUN_ENV')}）")
+        return False
     bucket = os.environ.get("COS_BUCKET", "")
     if not bucket:
-        return
-
+        print(f"⚠️ COS_BUCKET 环境变量未配置，当前环境变量: {[k for k in os.environ if 'COS' in k or 'WX' in k or 'TENCENT' in k]}")
+        return False
     try:
         import requests as req
-        auth_resp = req.get("http://api.weixin.qq.com/_/cos/getauth", timeout=5)
+        print(f"🔍 正在获取COS临时密钥... (bucket={bucket}, key={key})")
+        auth_resp = req.get("http://api.weixin.qq.com/_/cos/getauth", timeout=10)
         if auth_resp.status_code != 200:
-            return
+            print(f"⚠️ 获取COS密钥失败: HTTP {auth_resp.status_code}, body={auth_resp.text[:200]}")
+            return False
         auth = auth_resp.json()
+        if "TmpSecretId" not in auth:
+            print(f"⚠️ COS密钥返回格式异常: {list(auth.keys())}")
+            return False
+
         from qcloud_cos import CosConfig, CosS3Client
         region = os.environ.get("COS_REGION", "ap-shanghai")
         config = CosConfig(Region=region, SecretId=auth["TmpSecretId"], SecretKey=auth["TmpSecretKey"], Token=auth["Token"])
         client = CosS3Client(config)
-
-        # 检查 test_video.mp4 是否已存在
-        target = VIDEO_DIR / "test_video.mp4"
-        if target.exists():
-            print("✅ 测试视频已存在，跳过下载")
-            return
-
-        print("📦 从对象存储下载测试视频...")
-        resp = client.get_object(Bucket=bucket, Key="test_video.mp4")
-        resp["Body"].get_stream_to_file(str(target))
-        print(f"✅ 测试视频下载完成 ({target.stat().st_size / 1024 / 1024:.1f} MB)")
+        print(f"📦 从对象存储下载 {key} → {local_path} (region={region}, bucket={bucket})...")
+        resp = client.get_object(Bucket=bucket, Key=key)
+        resp["Body"].get_stream_to_file(str(local_path))
+        size_mb = local_path.stat().st_size / 1024 / 1024
+        print(f"✅ 下载完成: {local_path} ({size_mb:.1f} MB)")
+        return True
     except Exception as e:
-        print(f"⚠️ 视频同步失败: {e}")
+        import traceback
+        print(f"⚠️ 从COS下载失败: {e}")
+        traceback.print_exc()
+        return False
 
-# 模块加载时自动执行（gunicorn 启动也会触发）
-_sync_video_from_cos()
+
+def _sync_video_from_cos():
+    """云托管环境下，从对象存储下载视频到 temp_input（仅当本地不存在时）"""
+    target = VIDEO_DIR / "test_video.mp4"
+    if target.exists():
+        print("✅ 测试视频已存在，跳过下载")
+        return
+    _download_from_cos("test_video.mp4", target)
+
+# 模块加载时异步执行（不阻塞 gunicorn 就绪，冷启动秒级响应）
+threading.Thread(target=_sync_video_from_cos, daemon=True).start()
 
 if __name__ == '__main__':
     # 本地开发时自动预热引擎

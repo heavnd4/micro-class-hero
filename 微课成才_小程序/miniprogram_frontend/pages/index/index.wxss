@@ -192,6 +192,40 @@ video {
   margin-bottom: 8rpx;
 }
 
+/* 冷启动等待覆盖层 */
+.cold-start-overlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80rpx 40rpx;
+  text-align: center;
+}
+
+.cold-start-icon {
+  font-size: 80rpx;
+  margin-bottom: 30rpx;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.4; transform: scale(0.95); }
+  50% { opacity: 1; transform: scale(1.05); }
+}
+
+.cold-start-text {
+  font-size: 30rpx;
+  color: #666;
+  line-height: 1.8;
+}
+
+.cold-start-text secondary {
+  display: block;
+  font-size: 24rpx;
+  color: #999;
+  margin-top: 10rpx;
+}
+
 .debug-tag {
   font-size: 20rpx;
   color: #ff6f00;
