@@ -3,19 +3,22 @@
 FROM python:3.11-slim
 
 # 系统依赖：FFmpeg（音视频处理）+ OpenCV 运行时库
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN sed -i 's|deb.debian.org|mirrors.cloud.tencent.com|g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || \
+    sed -i 's|deb.debian.org|mirrors.cloud.tencent.com|g' /etc/apt/sources.list 2>/dev/null; \
+    apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
-    libgl1-mesa-glx \
+    libgl1 \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# 安装 Python 依赖（用阿里云镜像加速）
+# 安装 Python 依赖（用腾讯云镜像加速，超时 120s）
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt \
-    -i https://mirrors.aliyun.com/pypi/simple \
-    --extra-index-url https://download.pytorch.org/whl/cpu
+RUN pip install --no-cache-dir --timeout 120 -r requirements.txt \
+    -i https://mirrors.cloud.tencent.com/pypi/simple \
+    --extra-index-url https://download.pytorch.org/whl/cpu \
+    --trusted-host mirrors.cloud.tencent.com
 
 # 复制项目代码（.dockerignore 会排除 models/ 和 temp_*/）
 COPY . .

@@ -151,9 +151,48 @@ def start_process():
 
 # ========== 视频播放接口 ==========
 
+@app.route('/api/get_video_url')
+def get_video_url():
+    """获取视频播放临时链接（云托管环境通过 COS 生成，本地环境返回本地路径）"""
+    video_name = request.args.get('video', 'test_video.mp4')
+
+    # 本地环境：直接返回本地视频路径
+    env_flag = os.environ.get("WX_ENV") or os.environ.get("TENCENTCLOUD_RUN_ENV")
+    if not env_flag:
+        return jsonify({"url": f"/video/{video_name}"})
+
+    # 云托管环境：通过 COS 生成临时访问链接
+    bucket = os.environ.get("COS_BUCKET", "")
+    if not bucket:
+        return jsonify({"status": "error", "message": "COS_BUCKET 未配置"}), 500
+
+    try:
+        import requests as req
+        auth_resp = req.get("http://api.weixin.qq.com/_/cos/getauth", timeout=5)
+        if auth_resp.status_code != 200:
+            return jsonify({"status": "error", "message": "获取COS密钥失败"}), 500
+        auth = auth_resp.json()
+
+        from qcloud_cos import CosConfig, CosS3Client
+        region = os.environ.get("COS_REGION", "ap-shanghai")
+        config = CosConfig(Region=region, SecretId=auth["TmpSecretId"], SecretKey=auth["TmpSecretKey"], Token=auth["Token"])
+        client = CosS3Client(config)
+
+        # 生成预签名URL，有效期1小时
+        url = client.get_presigned_url(
+            Method='GET',
+            Bucket=bucket,
+            Key=video_name,
+            Expires=3600
+        )
+        return jsonify({"url": url})
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"获取视频链接失败: {str(e)}"}), 500
+
+
 @app.route('/video/<path:filename>')
 def serve_video(filename):
-    """输出视频流接口"""
+    """输出视频流接口（本地开发用）"""
     return send_from_directory(VIDEO_DIR, filename)
 
 
@@ -205,6 +244,42 @@ def download_word():
 
 
 # ========== 启动 ==========
+
+def _sync_video_from_cos():
+    """云托管环境下，从对象存储下载视频到 temp_input（仅当本地不存在时）"""
+    env_flag = os.environ.get("WX_ENV") or os.environ.get("TENCENTCLOUD_RUN_ENV")
+    if not env_flag:
+        return
+    bucket = os.environ.get("COS_BUCKET", "")
+    if not bucket:
+        return
+
+    try:
+        import requests as req
+        auth_resp = req.get("http://api.weixin.qq.com/_/cos/getauth", timeout=5)
+        if auth_resp.status_code != 200:
+            return
+        auth = auth_resp.json()
+        from qcloud_cos import CosConfig, CosS3Client
+        region = os.environ.get("COS_REGION", "ap-shanghai")
+        config = CosConfig(Region=region, SecretId=auth["TmpSecretId"], SecretKey=auth["TmpSecretKey"], Token=auth["Token"])
+        client = CosS3Client(config)
+
+        # 检查 test_video.mp4 是否已存在
+        target = VIDEO_DIR / "test_video.mp4"
+        if target.exists():
+            print("✅ 测试视频已存在，跳过下载")
+            return
+
+        print("📦 从对象存储下载测试视频...")
+        resp = client.get_object(Bucket=bucket, Key="test_video.mp4")
+        resp["Body"].get_stream_to_file(str(target))
+        print(f"✅ 测试视频下载完成 ({target.stat().st_size / 1024 / 1024:.1f} MB)")
+    except Exception as e:
+        print(f"⚠️ 视频同步失败: {e}")
+
+# 模块加载时自动执行（gunicorn 启动也会触发）
+_sync_video_from_cos()
 
 if __name__ == '__main__':
     # 本地开发时自动预热引擎

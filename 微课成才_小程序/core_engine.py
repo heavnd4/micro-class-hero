@@ -4,6 +4,8 @@ import os
 import time
 import gc
 import re
+import requests
+import shutil
 from pathlib import Path
 import anthropic
 from docx import Document
@@ -11,6 +13,96 @@ from docx.shared import Inches, Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 import cv2
 import numpy as np
+
+# ========== 云托管对象存储工具 ==========
+
+def _is_cloud_env():
+    """判断是否运行在云托管环境"""
+    return os.environ.get("WX_ENV") or os.environ.get("TENCENTCLOUD_RUN_ENV") or os.environ.get("WX_CLOUD_RUN")
+
+def _sync_models_from_cos(models_dir: Path):
+    """从对象存储同步模型文件到本地（仅云托管环境）"""
+    if not _is_cloud_env():
+        return
+
+    whisper_dir = models_dir / "models--Systran--faster-whisper-small"
+    # 检查核心模型文件是否已存在
+    if whisper_dir.exists() and (whisper_dir / "snapshots" / "main" / "model.bin").exists():
+        print("✅ 模型文件已存在，跳过同步")
+        return
+
+    print("📦 模型文件不存在，开始从对象存储同步...")
+    try:
+        # 获取 COS 临时密钥
+        auth_resp = requests.get("http://api.weixin.qq.com/_/cos/getauth", timeout=5)
+        if auth_resp.status_code != 200:
+            print("⚠️ 无法获取 COS 临时密钥，跳过模型同步")
+            return
+        auth = auth_resp.json()
+    except Exception as e:
+        print(f"⚠️ 获取 COS 临时密钥失败: {e}，跳过模型同步")
+        return
+
+    try:
+        from qcloud_cos import CosConfig, CosS3Client
+
+        # 从环境变量获取存储桶信息（控制台 → 对象存储 → 存储配置）
+        bucket = os.environ.get("COS_BUCKET", "")
+        region = os.environ.get("COS_REGION", "ap-shanghai")
+
+        if not bucket:
+            print("⚠️ 未配置 COS_BUCKET 环境变量，跳过模型同步")
+            print("   请在云托管环境变量中设置 COS_BUCKET（存储桶名称）")
+            return
+
+        config = CosConfig(
+            Region=region,
+            SecretId=auth["TmpSecretId"],
+            SecretKey=auth["TmpSecretKey"],
+            Token=auth["Token"]
+        )
+        client = CosS3Client(config)
+
+        # 列出对象存储中 /models/ 下的所有文件
+        marker = ""
+        total_files = 0
+        while True:
+            resp = client.list_objects(Bucket=bucket, Prefix="models/", Marker=marker, MaxKeys=200)
+            contents = resp.get("Contents", [])
+            if not contents:
+                break
+
+            for obj in contents:
+                key = obj["Key"]
+                # 跳过目录本身
+                if key.endswith("/"):
+                    continue
+                # 计算本地路径（去掉 "models/" 前缀）
+                relative = key[len("models/"):]
+                local_path = models_dir / relative
+                local_path.parent.mkdir(parents=True, exist_ok=True)
+
+                # 跳过已存在的文件
+                if local_path.exists() and local_path.stat().st_size == int(obj["Size"]):
+                    continue
+
+                # 下载文件
+                print(f"  ⬇️ 下载 {relative}...")
+                response = client.get_object(Bucket=bucket, Key=key)
+                response["Body"].get_stream_to_file(str(local_path))
+                total_files += 1
+
+            if resp.get("IsTruncated"):
+                marker = resp.get("NextMarker", "")
+            else:
+                break
+
+        print(f"✅ 模型同步完成，共下载 {total_files} 个文件")
+    except ImportError:
+        print("⚠️ cos-python-sdk-v5 未安装，跳过模型同步")
+        print("   请在 requirements.txt 中添加 cos-python-sdk-v5")
+    except Exception as e:
+        print(f"⚠️ 模型同步失败: {e}")
 
 class VideoProcessor:
     def __init__(self, base_dir=None, api_key=None):
@@ -24,6 +116,10 @@ class VideoProcessor:
         self.models_dir = self.base_dir / "models"
         if not self.models_dir.exists():
             self.models_dir = self.base_dir.parent / "models"
+        self.models_dir.mkdir(exist_ok=True, parents=True)
+
+        # 1.5 云端环境：从对象存储同步模型
+        _sync_models_from_cos(self.models_dir)
 
         # 2. 初始化配置
         self.api_key = api_key or os.environ.get("DASHSCOPE_API_KEY", "")

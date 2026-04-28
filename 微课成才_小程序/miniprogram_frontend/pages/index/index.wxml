@@ -31,7 +31,11 @@
   <!-- 答题进度 + 退出按钮 -->
   <view class="quiz-header" wx:if="{{questions.length > 0}}">
     <text class="quiz-progress">第 {{currentQIdx + 1}} / {{questions.length}} 题</text>
-    <button class="exit-quiz-btn" size="mini" bindtap="exitQuiz">退出答题</button>
+    <view class="quiz-header-right">
+      <!-- 调试模式：跳题按钮 -->
+      <button class="debug-btn" size="mini" wx:if="{{debugMode}}" bindtap="skipToQuestion">跳题</button>
+      <button class="exit-quiz-btn" size="mini" bindtap="exitQuiz">退出答题</button>
+    </view>
   </view>
 
   <!-- 题目挑战区 (处理完成后显示) -->
@@ -39,6 +43,12 @@
     <view class="q-card">
       <text class="q-type">【{{questions[currentQIdx].type}}】</text>
       <text class="q-text">{{questions[currentQIdx].question}}</text>
+
+      <!-- 调试模式：快捷跳题按钮 -->
+      <view class="debug-toolbar" wx:if="{{debugMode}}">
+        <button class="debug-tag" size="mini" bindtap="skipToType" data-type="简答题">跳到简答</button>
+        <button class="debug-tag" size="mini" bindtap="skipToLast">末尾</button>
+      </view>
       
       <!-- 选择题 / 判断题 / 多选题：选项按钮 -->
       <view class="options" wx:if="{{questions[currentQIdx].options}}">

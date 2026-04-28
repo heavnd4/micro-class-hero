@@ -9,3 +9,4 @@ paddleocr
 opencv-python-headless
 numpy
 ctranslate2==4.6.0
+cos-python-sdk-v5

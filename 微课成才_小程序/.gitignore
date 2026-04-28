@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# 部署产物
+deploy.zip
+
+# 工作目录
+.workbuddy/
+
+# 截图和临时文件
+*.png
+*.jpg
+*.jpeg
+过程记录.txt
+腾讯云云托管密钥.txt
+
+# IDE
+.vscode/
+.idea/
+
+# 小程序
+miniprogram_frontend/node_modules/
+
+# 环境文件
+.env
