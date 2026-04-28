@@ -88,13 +88,18 @@ App({
     try {
       const cloud = await this._ensureCloud();
 
+      // 根据接口类型设置不同超时：探测类短一些，业务类长一些
+      const isProbe = path.indexOf('/api/health') !== -1 || path.indexOf('/api/engine_status') !== -1;
+      const timeout = isProbe ? 10000 : 30000; // 探测 10s，业务 30s
+
       const result = await cloud.callContainer({
         path: path,
         method: options.method || 'GET',
         header: Object.assign({}, options.header, {
           'X-WX-SERVICE': this.globalData.cloudService
         }),
-        data: options.data
+        data: options.data,
+        timeout: timeout
       });
 
       return { statusCode: result.statusCode, data: result.data, header: result.header };

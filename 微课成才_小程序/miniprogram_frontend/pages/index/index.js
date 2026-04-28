@@ -47,8 +47,11 @@ Page({
         this.startWarmupCountdown(40)
       }
 
-      // 后端存活了，加载视频
-      this.loadVideoUrl()
+      // 后端存活了，等 2 秒让容器稳定一下再加载资源
+      console.log('[探测] 后端已存活，2 秒后加载资源...')
+      setTimeout(() => {
+        this.loadVideoUrl()
+      }, 2000)
     }).catch(err => {
       // 第一次探测失败 = 冷启动中
       console.log('[探测] 后端未响应（冷启动中），开始轮询等待...', err)
@@ -80,8 +83,11 @@ Page({
           this.startWarmupCountdown(40)
         }
 
-        // 后端活了，加载视频
-        this.loadVideoUrl()
+        // 后端活了，等 2 秒再加载资源
+        console.log('[探测] 后端已存活，2 秒后加载资源...')
+        setTimeout(() => {
+          this.loadVideoUrl()
+        }, 2000)
       }).catch(() => {
         if (attempts >= maxAttempts) {
           clearInterval(timer)
@@ -102,7 +108,7 @@ Page({
     }, 5000)
   },
 
-  loadVideoUrl() {
+  loadVideoUrl(retryCount = 0) {
     if (app.globalData.localMode) {
       this.setData({ videoUrl: app.globalData.localServerUrl + '/video/test_video.mp4' })
       return
@@ -111,12 +117,27 @@ Page({
     app.api('/api/get_video_url?video=test_video.mp4').then(res => {
       if (res.statusCode === 200 && res.data.url) {
         this.setData({ videoUrl: res.data.url })
+        console.log('[视频] 加载成功')
       } else {
-        console.log('获取视频链接失败:', res.data)
+        console.log('[视频] 获取视频链接失败:', res.data)
+        this._retryLoadVideo(retryCount)
       }
     }).catch(err => {
-      console.log('获取视频链接失败:', err)
+      console.log('[视频] 获取视频链接失败:', err)
+      this._retryLoadVideo(retryCount)
     })
+  },
+
+  _retryLoadVideo(retryCount) {
+    if (retryCount < 3) {
+      const delay = 3000 * (retryCount + 1) // 3s, 6s, 9s
+      console.log(`[视频] ${delay / 1000}s 后重试 (${retryCount + 1}/3)...`)
+      setTimeout(() => {
+        this.loadVideoUrl(retryCount + 1)
+      }, delay)
+    } else {
+      console.warn('[视频] 重试 3 次仍失败，放弃')
+    }
   },
 
   startWarmupCountdown(seconds) {
@@ -148,9 +169,11 @@ Page({
 
   checkEngineReady() {
     app.api('/api/engine_status').then(res => {
-      if (res.data.ready) {
+      if (res.data && res.data.ready) {
         this.setData({ engineReady: true, engineWarming: false, warmupCountdown: 0 })
       }
+    }).catch(() => {
+      // 静默失败，下次定时器会再检查
     })
   },
 
