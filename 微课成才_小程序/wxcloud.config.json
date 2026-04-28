@@ -1,0 +1,34 @@
+{
+  "envId": "study-d2g0ezztf8f8798f3",
+  "framework": "custom",
+  "services": [
+    {
+      "name": "weike-backend",
+      "containerPort": 5000,
+      "cpu": 2,
+      "mem": 4,
+      "minNum": 0,
+      "maxNum": 5,
+      "policy": {
+        "minNum": 0,
+        "maxNum": 5
+      },
+      "container": {
+        "env": [
+          {
+            "key": "PYTHONUNBUFFERED",
+            "value": "1"
+          },
+          {
+            "key": "PORT",
+            "value": "5000"
+          },
+          {
+            "key": "DASHSCOPE_API_KEY",
+            "value": "${DASHSCOPE_API_KEY}"
+          }
+        ]
+      }
+    }
+  ]
+}
