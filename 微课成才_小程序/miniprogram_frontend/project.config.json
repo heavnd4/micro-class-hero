@@ -42,7 +42,7 @@
     "ignoreUploadUnusedFiles": true
   },
   "compileType": "miniprogram",
-  "libVersion": "3.3.4",
+  "libVersion": "3.5.8",
   "appid": "wxc4a691061fdb1ecc",
   "projectname": "micro-class-hero",
   "condition": {},

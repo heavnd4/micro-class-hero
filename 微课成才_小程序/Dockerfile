@@ -13,6 +13,9 @@ RUN sed -i 's|deb.debian.org|mirrors.cloud.tencent.com|g' /etc/apt/sources.list.
 
 WORKDIR /app
 
+# 复制模型文件（whisper ~464MB，利用 Docker 层缓存，代码改动不会重新复制）
+COPY models/ ./models/
+
 # 安装 Python 依赖（用腾讯云镜像加速，超时 120s）
 COPY requirements.txt .
 RUN pip install --no-cache-dir --timeout 120 -r requirements.txt \
@@ -23,8 +26,8 @@ RUN pip install --no-cache-dir --timeout 120 -r requirements.txt \
 # 复制项目代码（.dockerignore 会排除 models/ 和 temp_*/）
 COPY . .
 
-# 创建存储目录（云托管会自动挂载持久化存储）
-RUN mkdir -p /app/models /app/temp_input /app/temp_output
+# 创建临时目录（云托管会自动挂载持久化存储）
+RUN mkdir -p /app/temp_input /app/temp_output
 
 # 环境变量
 ENV PYTHONUNBUFFERED=1

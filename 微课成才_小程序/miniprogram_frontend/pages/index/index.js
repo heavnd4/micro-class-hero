@@ -147,16 +147,18 @@ Page({
       if (remaining <= 0) {
         clearInterval(timer)
         this.setData({ warmupCountdown: 0 })
-        this.checkEngineReady()
+        // 倒计时结束不停止轮询，checkTimer 会继续检查
         return
       }
       this.setData({ warmupCountdown: remaining })
     }, 1000)
 
+    // 持续轮询引擎状态，直到引擎就绪为止（不设上限）
     const checkTimer = setInterval(() => {
       if (this.data.engineReady) {
         clearInterval(checkTimer)
         clearInterval(timer)
+        console.log('[预热] 引擎已就绪，停止轮询')
         return
       }
       this.checkEngineReady()
@@ -179,9 +181,12 @@ Page({
 
   startProcess() {
     if (!this.data.engineReady && this.data.engineWarming) {
+      const msg = this.data.warmupCountdown > 0
+        ? `模型正在加载，预计还需 ${this.data.warmupCountdown} 秒，请稍后再试`
+        : '模型仍在加载中（首次启动较慢），请耐心等待...'
       wx.showModal({
         title: '炼化炉预热中',
-        content: `模型正在加载，预计还需 ${this.data.warmupCountdown} 秒，请稍后再试`,
+        content: msg,
         showCancel: false
       })
       return
